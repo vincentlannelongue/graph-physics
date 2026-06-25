@@ -1,6 +1,7 @@
 import os
 from typing import Dict, List, Optional
 
+from graphphysics.utils import loss
 import lightning as L
 import torch
 import torch.nn as nn
@@ -31,6 +32,17 @@ def build_mask(param: dict, graph: Batch):
         node_type = graph.x[:, param["index"]["node_type_index"]]
     mask = torch.logical_or(node_type == NodeType.NORMAL, node_type == NodeType.OUTFLOW)
     mask = torch.logical_not(mask)
+
+    return mask
+
+
+def build_aneurysm_mask(param: dict, graph: Batch):
+    if len(graph.x.shape) > 2:
+        node_type = graph.x[:, 0, param["index"]["node_type_index"]]
+    else:
+        node_type = graph.x[:, param["index"]["node_type_index"]]
+    # mask = node_type == NodeType.ANEURYSM
+    mask = torch.logical_and(graph.pos[:, 1] >= 7.8, node_type == NodeType.NORMAL)
 
     return mask
 
@@ -101,8 +113,11 @@ class LightningModule(L.LightningModule):
 
         self.step_counter = 0
         self.first_step_losses: List[torch.Tensor] = []
+        self.first_step_losses_aneurysm: List[torch.Tensor] = []
         self.val_step_outputs = []
         self.val_step_targets = []
+        self.val_step_outputs_aneurysm = []
+        self.val_step_targets_aneurysm = []
         self.trajectory_length = trajectory_length
         self.timestep = timestep
         self.current_val_trajectory = 0
@@ -298,7 +313,7 @@ class LightningModule(L.LightningModule):
                     prog_bar=False,
                 )
             self.log(
-                "train_multiloss", loss, on_step=True, on_epoch=True, prog_bar=True
+                "train_multiloss", loss, on_step=True, on_epoch=True, prog_bar=False
             )
 
         else:  # Will raise an error if the single loss needs physical outputs.
@@ -316,7 +331,7 @@ class LightningModule(L.LightningModule):
                 loss,
                 on_step=True,
                 on_epoch=True,
-                prog_bar=True,
+                prog_bar=False,
             )
         if self.use_spatial_mtp and self.training:
             aux_loss, stats = self._compute_spatial_mtp_loss(
@@ -425,39 +440,49 @@ class LightningModule(L.LightningModule):
             batch, self.last_val_prediction, self.last_previous_data_prediction
         )
 
-        if self.current_val_trajectory == 0:
-            self._save_batch_to_xdmf(
-                batch,
-                os.path.join("meshes", f"epoch_{self.current_epoch}"),
-                self._get_frame_savename(
-                    batch,
-                    self.current_val_trajectory,
-                    prefix=f"graph_epoch_{self.current_epoch}",
-                ),
-                timestep=self.timestep,
-            )
+        # if self.current_val_trajectory == 0:
+        #     self._save_batch_to_xdmf(
+        #         batch,
+        #         os.path.join("meshes", f"epoch_{self.current_epoch}"),
+        #         self._get_frame_savename(
+        #             batch,
+        #             self.current_val_trajectory,
+        #             prefix=f"graph_epoch_{self.current_epoch}",
+        #         ),
+        #         timestep=self.timestep,
+        #     )
         node_type = batch.x[:, self.model.node_type_index]
+        aneurysm_mask = build_aneurysm_mask(self.param, batch).to(self.device)
 
         self.val_step_outputs.append(predicted_outputs.cpu())
         self.val_step_targets.append(target.cpu())
+        self.val_step_outputs_aneurysm.append(predicted_outputs[aneurysm_mask].cpu())
+        self.val_step_targets_aneurysm.append(target[aneurysm_mask].cpu())
         val_loss = self.val_loss(
             target,
             predicted_outputs,
             node_type,
             masks=self.loss_masks,
         )
-        self.log("val_loss", val_loss, on_step=True, on_epoch=True, prog_bar=True)
+        self.log("val_loss", val_loss, on_step=True, on_epoch=True, prog_bar=False)
 
         # compute RMSE for the first step
         if self.step_counter == 0:
             squared_diff = (predicted_outputs - target) ** 2
-            rmse = torch.sqrt(squared_diff.mean()).detach().cpu()
+            rmse = torch.sqrt(squared_diff[:, 0:3].mean()).detach().cpu()
+            rmse_aneurysm = (
+                torch.sqrt(squared_diff[aneurysm_mask, 0:3].mean()).detach().cpu()
+            )
             self.first_step_losses.append(rmse)
+            self.first_step_losses_aneurysm.append(rmse_aneurysm)
+
         self.step_counter += 1
 
     def _reset_validation_epoch_end(self):
         self.val_step_outputs.clear()
         self.val_step_targets.clear()
+        self.val_step_outputs_aneurysm.clear()
+        self.val_step_targets_aneurysm.clear()
         self.current_val_trajectory = 0
         self.last_val_prediction = None
         self.last_previous_data_prediction = None
@@ -469,23 +494,49 @@ class LightningModule(L.LightningModule):
         predicteds = torch.cat(self.val_step_outputs, dim=0)
         targets = torch.cat(self.val_step_targets, dim=0)
 
+        predicteds_aneurysm = torch.cat(self.val_step_outputs_aneurysm, dim=0)
+        targets_aneurysm = torch.cat(self.val_step_targets_aneurysm, dim=0)
+
         # Compute RMSE over all rollouts
         squared_diff = (predicteds - targets) ** 2
-        all_rollout_rmse = torch.sqrt(squared_diff.mean()).item()
+        squared_diff_aneurysm = (predicteds_aneurysm - targets_aneurysm) ** 2
+
+        space_mean_squared_diff = torch.mean(torch.mean(squared_diff, dim=1), dim=1)
+        all_rollout_rmse = torch.mean(torch.sqrt(space_mean_squared_diff))
+
+        space_mean_squared_diff_aneurysm = torch.mean(torch.mean(squared_diff_aneurysm, dim=1), dim=1)
+        all_rollout_rmse_aneurysm = torch.mean(torch.sqrt(space_mean_squared_diff_aneurysm))
 
         self.log(
             "val_all_rollout_rmse",
             all_rollout_rmse,
             on_step=False,
             on_epoch=True,
-            prog_bar=True,
+            prog_bar=False,
+        )
+
+        self.log(
+            "val_all_rollout_rmse_aneurysm",
+            all_rollout_rmse_aneurysm,
+            on_step=False,
+            on_epoch=True,
+            prog_bar=False,
         )
 
         # Compute RMSE for the first step
         if self.first_step_losses:
             mean_first_step_loss = torch.stack(self.first_step_losses).mean().item()
             self.log(
-                "val_1step_rmse", mean_first_step_loss, on_epoch=True, prog_bar=True
+                "val_1step_rmse", mean_first_step_loss, on_epoch=True, prog_bar=False
+            )
+            mean_first_step_loss_aneurysm = (
+                torch.stack(self.first_step_losses_aneurysm).mean().item()
+            )
+            self.log(
+                "val_1step_rmse_aneurysm",
+                mean_first_step_loss_aneurysm,
+                on_epoch=True,
+                prog_bar=False,
             )
 
         # Clear stored outputs
