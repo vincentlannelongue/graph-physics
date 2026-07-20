@@ -289,10 +289,10 @@ class LightningModule(L.LightningModule):
             self._H_nodeenc = None
         node_type = batch.x[:, self.model.node_type_index]
         network_output, target_delta_normalized, _ = self.model(batch)
+        network_output_physical = self.model.build_outputs(batch, network_output)
+        target_physical = self.model.build_outputs(batch, target_delta_normalized)
 
         if self.is_multiloss:
-            network_output_physical = self.model.build_outputs(batch, network_output)
-            target_physical = self.model.build_outputs(batch, target_delta_normalized)
             loss, train_losses = self.loss(
                 graph=batch,
                 target=target_delta_normalized,
@@ -323,6 +323,8 @@ class LightningModule(L.LightningModule):
                 network_output=network_output,
                 node_type=node_type,
                 masks=self.loss_masks,
+                network_output_physical=network_output_physical,
+                target_physical=target_physical,
                 gradient_method=self.gradient_method,
             )
 
@@ -501,10 +503,10 @@ class LightningModule(L.LightningModule):
         squared_diff = (predicteds - targets) ** 2
         squared_diff_aneurysm = (predicteds_aneurysm - targets_aneurysm) ** 2
 
-        space_mean_squared_diff = torch.mean(torch.mean(squared_diff, dim=1), dim=1)
+        space_mean_squared_diff = torch.mean(torch.mean(squared_diff, dim=1), dim=-1)
         all_rollout_rmse = torch.mean(torch.sqrt(space_mean_squared_diff))
 
-        space_mean_squared_diff_aneurysm = torch.mean(torch.mean(squared_diff_aneurysm, dim=1), dim=1)
+        space_mean_squared_diff_aneurysm = torch.mean(torch.mean(squared_diff_aneurysm, dim=1), dim=-1)
         all_rollout_rmse_aneurysm = torch.mean(torch.sqrt(space_mean_squared_diff_aneurysm))
 
         self.log(

@@ -426,6 +426,49 @@ class DivergenceL1SmoothLoss(_Loss):
         return torch.mean(errors)
 
 
+class RelativeL2Loss(_Loss):
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+
+    @property
+    def __name__(self):
+        return "RelativeL2"
+
+    def forward(
+        self,
+        target: torch.Tensor,
+        network_output: torch.Tensor,
+        node_type: torch.Tensor,
+        masks: list[NodeType],
+        selected_indexes: torch.Tensor = None,
+        epsilon: float = None,
+        **kwargs
+    ) -> torch.Tensor:
+        """
+        Computes L2 log loss for nodes of specific types.
+
+        Args:
+            target (torch.Tensor): The target values.
+            network_output (torch.Tensor): The predicted values from the network.
+            node_type (torch.Tensor): Tensor containing the type of each node.
+            masks (list[NodeType]): List of NodeTypes to include in the loss calculation.
+            selected_indexes (torch.Tensor, optional): Indexes of nodes to exclude from the loss calculation.
+
+        Returns:
+            torch.Tensor: The mean squared error for the specified node types.
+
+        Note:
+            This method calculates the L2 loss only for nodes of the types specified in 'masks'.
+            If 'selected_indexes' is provided, those nodes are excluded from the loss calculation.
+        """
+        mask = _prepare_mask_for_loss(
+            network_output, node_type, masks, selected_indexes
+        )
+        epsilon = torch.max(target[:, 0:3])/1000
+        errors = ((network_output - target) ** 2 / (target ** 2 + epsilon))[mask]
+        return torch.mean(errors)
+
+
 class MultiLoss(_Loss):
     def __init__(self, losses, weights, **kwargs):
         super().__init__(**kwargs)
@@ -461,6 +504,9 @@ class MultiLoss(_Loss):
                 method=gradient_method,
                 device=device,
             )
+        else:
+            network_output_gradient = None
+            target_gradient = None
 
         losses = [
             w
@@ -482,6 +528,50 @@ class MultiLoss(_Loss):
             return errors
 
 
+class L2LossNorm(_Loss):
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+
+    @property
+    def __name__(self):
+        return "MSE_norm"
+
+    def forward(
+        self,
+        target: torch.Tensor,
+        network_output: torch.Tensor,
+        node_type: torch.Tensor,
+        masks: list[NodeType],
+        selected_indexes: torch.Tensor = None,
+        **kwargs
+    ) -> torch.Tensor:
+        """
+        Computes L2 loss for nodes of specific types.
+
+        Args:
+            target (torch.Tensor): The target values.
+            network_output (torch.Tensor): The predicted values from the network.
+            node_type (torch.Tensor): Tensor containing the type of each node.
+            masks (list[NodeType]): List of NodeTypes to include in the loss calculation.
+            selected_indexes (torch.Tensor, optional): Indexes of nodes to exclude from the loss calculation.
+
+        Returns:
+            torch.Tensor: The mean squared error for the specified node types.
+
+        Note:
+            This method calculates the L2 loss only for nodes of the types specified in 'masks'.
+            If 'selected_indexes' is provided, those nodes are excluded from the loss calculation.
+        """
+        mask = _prepare_mask_for_loss(
+            network_output, node_type, masks, selected_indexes
+        )
+        pred_norm = torch.norm(network_output[:, 0:3], dim=1)
+        target_norm = torch.norm(target[:, 0:3], dim=1)
+        errors_norm = ((pred_norm - target_norm) ** 2)[mask]
+
+        return torch.mean(errors_norm)
+
+
 class LossType(enum.Enum):
     L2LOSS = L2Loss
     COSINEL2LOSS = CosineLoss
@@ -491,3 +581,5 @@ class LossType(enum.Enum):
     DIVERGENCEL2LOSS = DivergenceL2Loss
     DIVERGENCEL1LOSS = DivergenceL1Loss
     DIVERGENCEL1SMOOTHLOSS = DivergenceL1SmoothLoss
+    RELATIVEL2LOSS = RelativeL2Loss
+    L2NORM = L2LossNorm
