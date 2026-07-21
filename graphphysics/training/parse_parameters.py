@@ -58,6 +58,7 @@ def get_preprocessing(
             "noise_index_end": preprocessing_params.get("noise_index_end"),
             "noise_scale": noise_scale,
             "node_type_index": param["index"]["node_type_index"],
+            "training_nodetypes": get_masks(param),
         }
 
     world_pos_params = param.get("transformations", {}).get("world_pos_parameters", {})
@@ -338,3 +339,20 @@ def get_gradient_method(param: Dict[str, Any], **kwargs) -> str:
         logger.info("No gradient method specified.")
         gradient_method = None
     return gradient_method
+
+
+def get_masks(param: Dict[str, Any], **kwargs):
+    """
+    Parse parameters for loss masks, specifying the node types to include in the loss computation.
+    Args:
+        param (Dict[str, Any]): Dictionary containing configuration parameters.
+
+    Returns:
+        List[NodeType]: List of NodeTypes to include in the loss calculation.
+    """
+    try:
+        training_nodetypes = param["dataset"]["training_nodetypes"]
+        return [NodeType[t.upper()] for t in training_nodetypes]
+    except KeyError:
+        logger.info("No training nodetypes specified, fall back to default: NORMAL and OUTFLOW nodes.")
+        return [NodeType.NORMAL, NodeType.OUTFLOW]

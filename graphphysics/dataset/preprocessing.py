@@ -10,7 +10,7 @@ from torch_geometric.data import Batch, Data
 from torch_geometric.transforms import BaseTransform
 from torch_geometric.utils import to_undirected
 
-from graphphysics.utils.nodetype import NodeType
+from graphphysics.utils.nodetype import NodeType, build_mask_from_nodetypes
 
 
 def add_edge_features() -> List[Callable[[Data], Data]]:
@@ -180,6 +180,7 @@ def add_noise(
     noise_index_end: Union[int, List[int]],
     noise_scale: Union[float, List[float]],
     node_type_index: int,
+    training_nodetypes: List[NodeType],
     t: Optional[float] = None,
 ) -> Data:
     """
@@ -218,8 +219,9 @@ def add_noise(
 
     node_type = graph.x[:, node_type_index]
 
-    # Mask to zero noise for nodes that are not NORMAL
-    mask = node_type != NodeType.NORMAL
+    # Mask to zero noise for nodes that are not trained on
+    mask = build_mask_from_nodetypes(node_type, training_nodetypes)
+    mask = torch.logical_not(mask)
 
     for start, end, scale in zip(noise_index_start, noise_index_end, noise_scale):
         feature = graph.x[:, start:end]
@@ -430,6 +432,7 @@ def build_preprocessing(
             noise_index_end=noise_parameters["noise_index_end"],
             noise_scale=noise_parameters["noise_scale"],
             node_type_index=noise_parameters["node_type_index"],
+            training_nodetypes=noise_parameters["training_nodetypes"],
         )
         # Insert after the first transform
         preprocessing.insert(1, add_noise_transform)

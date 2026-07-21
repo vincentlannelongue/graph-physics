@@ -12,6 +12,7 @@ from graphphysics.models.spatial_mtp_1hop import SpatialMTP1Hop
 from graphphysics.training.parse_parameters import (
     get_gradient_method,
     get_loss,
+    get_masks,
     get_model,
     get_simulator,
 )
@@ -21,16 +22,16 @@ from graphphysics.utils.meshio_mesh import (
     convert_to_meshio_vtu,
     meshes_to_xdmf,
 )
-from graphphysics.utils.nodetype import NodeType
+from graphphysics.utils.nodetype import NodeType, build_mask_from_nodetypes
 from graphphysics.utils.scheduler import CosineWarmupScheduler
 
 
-def build_mask(param: dict, graph: Batch):
+def build_prediction_mask(param: dict, graph: Batch, loss_masks: List[NodeType]):
     if len(graph.x.shape) > 2:
         node_type = graph.x[:, 0, param["index"]["node_type_index"]]
     else:
         node_type = graph.x[:, param["index"]["node_type_index"]]
-    mask = torch.logical_or(node_type == NodeType.NORMAL, node_type == NodeType.OUTFLOW)
+    mask = build_mask_from_nodetypes(node_type, loss_masks)
     mask = torch.logical_not(mask)
 
     return mask
@@ -57,7 +58,6 @@ class LightningModule(L.LightningModule):
         trajectory_length: int = 599,
         timestep: float = 1.0,
         only_processor: bool = False,
-        masks: list[NodeType] = [NodeType.NORMAL, NodeType.OUTFLOW],
         use_previous_data: bool = False,
         previous_data_start: int = None,
         previous_data_end: int = None,
@@ -74,7 +74,6 @@ class LightningModule(L.LightningModule):
             warmup (int): Number of warmup steps for the learning rate scheduler.
             only_processor (bool, optional): Whether to use only the processor part of the model.
                 Defaults to False.
-            masks (list[NodeType]): List of NodeTypes to include in the loss calculation.
             use_previous_data (bool): If set to true, we also update autoregressively the
               features at previous_data_start : previous_data_end
             prediction_save_path (str): Directory where predictions will be saved.
@@ -101,7 +100,7 @@ class LightningModule(L.LightningModule):
         if isinstance(self.loss, MultiLoss):
             self.is_multiloss = True
 
-        self.loss_masks = masks
+        self.loss_masks = get_masks(param=parameters)
         self.val_loss = L2Loss()
         self.gradient_method = get_gradient_method(
             param=parameters
@@ -401,7 +400,7 @@ class LightningModule(L.LightningModule):
                 batch.x[:, self.previous_data_start : self.previous_data_end] = (
                     last_previous_data_prediction.detach()
                 )
-        mask = build_mask(self.param, batch)
+        mask = build_prediction_mask(self.param, batch, self.loss_masks)
         target = batch.y
 
         current_output = batch.x[
