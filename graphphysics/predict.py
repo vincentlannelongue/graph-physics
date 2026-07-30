@@ -9,7 +9,7 @@ from loguru import logger
 from torch_geometric.loader import DataLoader
 
 import wandb
-from graphphysics.external.aneurysm import build_features
+from graphphysics.external.aneurysm import build_features, build_features_w_wss
 from graphphysics.training.lightning_module import LightningModule
 from graphphysics.training.parse_parameters import get_dataset, get_preprocessing
 
@@ -71,7 +71,7 @@ def main(argv):
         device=device,
         use_edge_feature=use_edge_feature,
         remove_noise=True,
-        extra_node_features=build_features,
+        extra_node_features=build_features_w_wss if "WSS" in parameters["dataset"]["targets"] else build_features,
     )
 
     # Get predict datasets

@@ -1,7 +1,6 @@
 import os
 from typing import Dict, List, Optional
 
-from graphphysics.utils import loss
 import lightning as L
 import torch
 import torch.nn as nn
@@ -34,6 +33,13 @@ def build_prediction_mask(param: dict, graph: Batch, loss_masks: List[NodeType])
     mask = build_mask_from_nodetypes(node_type, loss_masks)
     mask = torch.logical_not(mask)
 
+    # Comparing the witness mask and the loss mask to ensure they are consistent
+    # witness_mask = torch.logical_or(node_type == NodeType.NORMAL, node_type == NodeType.OUTFLOW)
+    # witness_mask = torch.logical_not(witness_mask)
+    # print(f"witness_mask: {witness_mask.sum().item()}, loss_mask: {mask.sum().item()}")
+    # print(f"comparison of some terms: {witness_mask[:10]}, {mask[:10]}")
+    # if not torch.equal(mask, witness_mask):
+    #     raise ValueError("Inconsistent mask definitions.")
     return mask
 
 
@@ -46,6 +52,12 @@ def build_aneurysm_mask(param: dict, graph: Batch):
     mask = torch.logical_and(graph.pos[:, 1] >= 7.8, node_type == NodeType.NORMAL)
 
     return mask
+
+
+def compute_rmse(predicteds, targets, index_start, index_end):
+    squared_diff = (predicteds - targets) ** 2
+    space_mean_squared_diff = torch.mean(torch.mean(squared_diff, dim=1), dim=-1)
+    return torch.mean(torch.sqrt(space_mean_squared_diff))
 
 
 class LightningModule(L.LightningModule):
@@ -127,8 +139,14 @@ class LightningModule(L.LightningModule):
         self.previous_data_start = previous_data_start
         self.previous_data_end = previous_data_end
 
-        # Prediction
-        self.prediction_save_path: str = prediction_save_path
+        # Prediction path handling: if the directory already exists, append a version number to avoid overwriting
+        version = 1
+        potential_path = prediction_save_path
+        while os.path.isdir(potential_path):
+            potential_path = f"{prediction_save_path}_v{version}"
+            version += 1
+        self.prediction_save_path: str = potential_path
+
         self.current_pred_trajectory = 0
         self.last_pred_prediction = None
         self.last_previous_data_pred_prediction = None
@@ -287,6 +305,8 @@ class LightningModule(L.LightningModule):
             self._penultimate_hidden = None
             self._H_nodeenc = None
         node_type = batch.x[:, self.model.node_type_index]
+        # print(f"NT: {node_type.shape}")
+        # print(f"NT: {node_type[6000]}")
         network_output, target_delta_normalized, _ = self.model(batch)
         network_output_physical = self.model.build_outputs(batch, network_output)
         target_physical = self.model.build_outputs(batch, target_delta_normalized)
@@ -393,18 +413,18 @@ class LightningModule(L.LightningModule):
         # Prepare the batch for the current step
         if last_prediction is not None:
             # Update the batch with the last prediction
-            batch.x[:, self.model.output_index_start : self.model.output_index_end] = (
+            batch.x[:, self.model.output_index_start: self.model.output_index_end] = (
                 last_prediction.detach()
             )
             if self.use_previous_data:
-                batch.x[:, self.previous_data_start : self.previous_data_end] = (
-                    last_previous_data_prediction.detach()
+                batch.x[:, self.previous_data_start: self.previous_data_end] = (
+                    last_previous_data_prediction[:, :self.previous_data_end - self.previous_data_start].detach()
                 )
         mask = build_prediction_mask(self.param, batch, self.loss_masks)
         target = batch.y
 
         current_output = batch.x[
-            :, self.model.output_index_start : self.model.output_index_end
+            :, self.model.output_index_start: self.model.output_index_end
         ]
 
         with torch.no_grad():
@@ -492,21 +512,19 @@ class LightningModule(L.LightningModule):
 
     def on_validation_epoch_end(self):
         # Concatenate outputs and targets
-        predicteds = torch.cat(self.val_step_outputs, dim=0)
-        targets = torch.cat(self.val_step_targets, dim=0)
 
-        predicteds_aneurysm = torch.cat(self.val_step_outputs_aneurysm, dim=0)
-        targets_aneurysm = torch.cat(self.val_step_targets_aneurysm, dim=0)
-
-        # Compute RMSE over all rollouts
-        squared_diff = (predicteds - targets) ** 2
-        squared_diff_aneurysm = (predicteds_aneurysm - targets_aneurysm) ** 2
-
-        space_mean_squared_diff = torch.mean(torch.mean(squared_diff, dim=1), dim=-1)
-        all_rollout_rmse = torch.mean(torch.sqrt(space_mean_squared_diff))
-
-        space_mean_squared_diff_aneurysm = torch.mean(torch.mean(squared_diff_aneurysm, dim=1), dim=-1)
-        all_rollout_rmse_aneurysm = torch.mean(torch.sqrt(space_mean_squared_diff_aneurysm))
+        all_rollout_rmse = compute_rmse(
+            torch.cat(self.val_step_outputs, dim=0),
+            torch.cat(self.val_step_targets, dim=0),
+            0,
+            3,
+        )
+        all_rollout_rmse_aneurysm = compute_rmse(
+            torch.cat(self.val_step_outputs_aneurysm, dim=0),
+            torch.cat(self.val_step_targets_aneurysm, dim=0),
+            0,
+            3,
+        )
 
         self.log(
             "val_all_rollout_rmse",
@@ -523,6 +541,22 @@ class LightningModule(L.LightningModule):
             on_epoch=True,
             prog_bar=False,
         )
+
+        if "WSS" in self.param["dataset"]["targets"]:
+            all_rollout_wss_rmse = compute_rmse(
+                torch.cat(self.val_step_outputs, dim=0),
+                torch.cat(self.val_step_targets, dim=0),
+                3,
+                6,
+            )
+
+            self.log(
+                "val_all_rollout_wss_rmse",
+                all_rollout_wss_rmse,
+                on_step=False,
+                on_epoch=True,
+                prog_bar=False,
+            )
 
         # Compute RMSE for the first step
         if self.first_step_losses:

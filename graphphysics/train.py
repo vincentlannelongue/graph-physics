@@ -12,7 +12,7 @@ from loguru import logger
 from torch_geometric.loader import DataLoader
 
 import wandb
-from graphphysics.external.aneurysm import build_features
+from graphphysics.external.aneurysm import build_features, build_features_w_wss
 # from graphphysics.training.callback import LogPyVistaPredictionsCallback
 from graphphysics.training.lightning_module import LightningModule
 from graphphysics.training.parse_parameters import (
@@ -21,6 +21,9 @@ from graphphysics.training.parse_parameters import (
     get_preprocessing,
 )
 from graphphysics.utils.progressbar import ColabProgressBar
+
+from setproctitle import setproctitle
+setproctitle("AX_trainings_part")
 
 warnings.filterwarnings(
     "ignore", ".*Trying to infer the `batch_size` from an ambiguous collection.*"
@@ -127,7 +130,7 @@ def main(argv):
         param=parameters,
         device=device,
         use_edge_feature=use_edge_feature,
-        extra_node_features=build_features,
+        extra_node_features=build_features_w_wss if "WSS" in parameters["dataset"]["targets"] else build_features,
     )
 
     # Get training and validation datasets
@@ -146,7 +149,7 @@ def main(argv):
         device=device,
         use_edge_feature=use_edge_feature,
         remove_noise=True,
-        extra_node_features=build_features,
+        extra_node_features=build_features_w_wss if "WSS" in parameters["dataset"]["targets"] else build_features,
     )
 
     val_dataset = get_dataset(

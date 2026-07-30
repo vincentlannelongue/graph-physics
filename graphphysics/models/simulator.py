@@ -120,6 +120,7 @@ class Simulator(nn.Module):
             torch.Tensor: One-hot encoded node types.
         """
         node_type = inputs.x[:, self.node_type_index]
+        # print(f"REAL UNIQUE: {torch.unique(node_type)}")
         return torch.nn.functional.one_hot(
             torch.squeeze(node_type.long()), NodeType.SIZE
         )

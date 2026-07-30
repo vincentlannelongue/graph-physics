@@ -21,6 +21,9 @@ def build_features(graph: Data) -> Data:
     next_acceleration = target_velocity - current_velocity
 
     not_inflow_mask = node_type != NodeType.INFLOW
+
+    # print(f"CHECK: {torch.max(current_velocity[not_inflow_mask])} and {torch.min(current_velocity[not_inflow_mask])}")
+
     next_acceleration[not_inflow_mask] = 0
     next_acceleration_unique = next_acceleration.unique()
 
