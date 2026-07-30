@@ -12,7 +12,7 @@
         "type": "transformer",
         "message_passing_num": 10,
         "hidden_size": 64,
-        "node_input_size": 15,
+        "node_input_size": 13,
         "output_size": 3,
         "edge_input_size": 0,
         "num_heads": 4,
@@ -22,10 +22,10 @@
     },
     "index": {
         "feature_index_start": 0,
-        "feature_index_end": 15,
+        "feature_index_end": 13,
         "output_index_start": 0,
         "output_index_end": 3,
-        "node_type_index": 15
+        "node_type_index": 13
     },
     "transformations": {
         "preprocessing": {
