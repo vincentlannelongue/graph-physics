@@ -99,7 +99,7 @@ def main(argv):
         logger.error(f"Error reading training parameters: {e}")
         return
 
-    if "test" in parameters["dataset"]["test_path"]:
+    if "inference" in parameters["dataset"]["test_path"]:
         raise ValueError(
             f"Test path in {training_parameters_path} is set to 'inference', which is not allowed for training."
         )
