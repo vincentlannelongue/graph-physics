@@ -2,7 +2,7 @@
     "dataset": {
         "extension": "xdmf",
         "train_path": "/scratch-big/vlannelongue1/00_Data/Datasets/BenchAnXplore/train",
-        "test_path": "/scratch-big/vlannelongue1/00_Data/Datasets/BenchAnXplore/inference",
+        "test_path": "/scratch-big/vlannelongue1/00_Data/Datasets/BenchAnXplore/test",
         "meta_path": "dataset_config/aneurysm_meta.json",
         "targets": ["Vitesse"],
         "khop": 1,
@@ -23,7 +23,7 @@
     "loss": {
         "type": ["l2loss", "gradientl2loss"],
         "gradient_method": "finite_diff",
-        "learnable_weights": true
+        "use_learnable_weights": true
     },
     "index": {
         "feature_index_start": 0,
