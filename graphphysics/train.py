@@ -13,6 +13,7 @@ from torch_geometric.loader import DataLoader
 
 import wandb
 from graphphysics.external.aneurysm import build_features, build_features_w_wss
+
 # from graphphysics.training.callback import LogPyVistaPredictionsCallback
 from graphphysics.training.lightning_module import LightningModule
 from graphphysics.training.parse_parameters import (
@@ -98,6 +99,10 @@ def main(argv):
         logger.error(f"Error reading training parameters: {e}")
         return
 
+    if "test" in parameters["dataset"]["test_path"]:
+        raise ValueError(
+            f"Test path in {training_parameters_path} is set to 'inference', which is not allowed for training."
+        )
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
     wandb_project_name = FLAGS.project_name
@@ -120,7 +125,9 @@ def main(argv):
     gradient_batch_size = FLAGS.gradient_batch_size
 
     training_params = parameters.setdefault("training", {})
-    enable_vram_optimizations = bool(training_params.get("enable_vram_optimizations", False))
+    enable_vram_optimizations = bool(
+        training_params.get("enable_vram_optimizations", False)
+    )
     training_params["enable_vram_optimizations"] = enable_vram_optimizations
 
     seed_everything(FLAGS.seed, workers=True)
@@ -130,7 +137,11 @@ def main(argv):
         param=parameters,
         device=device,
         use_edge_feature=use_edge_feature,
-        extra_node_features=build_features_w_wss if "WSS" in parameters["dataset"]["targets"] else build_features,
+        extra_node_features=(
+            build_features_w_wss
+            if "WSS" in parameters["dataset"]["targets"]
+            else build_features
+        ),
     )
 
     # Get training and validation datasets
@@ -149,7 +160,11 @@ def main(argv):
         device=device,
         use_edge_feature=use_edge_feature,
         remove_noise=True,
-        extra_node_features=build_features_w_wss if "WSS" in parameters["dataset"]["targets"] else build_features,
+        extra_node_features=(
+            build_features_w_wss
+            if "WSS" in parameters["dataset"]["targets"]
+            else build_features
+        ),
     )
 
     val_dataset = get_dataset(

@@ -2,7 +2,7 @@
     "dataset": {
         "extension": "xdmf",
         "train_path": "/scratch-big/vlannelongue1/00_Data/Datasets/BenchAnXplore/train",
-        "test_path": "/scratch-big/vlannelongue1/00_Data/Datasets/BenchAnXplore/inference",
+        "test_path": "/scratch-big/vlannelongue1/00_Data/Datasets/BenchAnXplore/test",
         "meta_path": "dataset_config/aneurysm_meta_wss.json",
         "targets": ["Vitesse", "WSS"],
         "training_nodetypes":["normal", "outflow", "wall_boundary"],

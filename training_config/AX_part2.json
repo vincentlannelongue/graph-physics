@@ -2,7 +2,7 @@
     "dataset": {
         "extension": "xdmf",
         "train_path": "/scratch-big/vlannelongue1/00_Data/Datasets/AnXplore/train",
-        "test_path": "/scratch-big/vlannelongue1/00_Data/Datasets/AnXplore/inference",
+        "test_path": "/scratch-big/vlannelongue1/00_Data/Datasets/AnXplore/test",
         "meta_path": "dataset_config/aneurysm_meta.json",
         "targets": ["Vitesse"],
         "khop": 1,
