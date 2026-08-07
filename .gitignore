@@ -25,3 +25,10 @@ wandb_download/
 AGENTS.md
 .codex/
 venvjax/*
+
+*.xdmf
+*.h5
+*.log
+_training_config/*
+_checkpoints/*
+_results/*

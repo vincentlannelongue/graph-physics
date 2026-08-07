@@ -318,7 +318,12 @@ def get_loss(param: Dict[str, Any], **kwargs):
         losses = [LossType[t.upper()].value(**kwargs) for t in param["loss"]["type"]]
         losses_names = [LossType[t.upper()].name for t in param["loss"]["type"]]
         weights = param["loss"]["weights"]
-        return MultiLoss(losses, weights), losses_names
+        use_learnable_weights = param["loss"].get("use_learnable_weights", False)
+        if use_learnable_weights:
+            logger.info("Using learnable weights for MultiLoss.")
+        else:
+            logger.info("Using fixed weights for MultiLoss.")
+        return MultiLoss(losses, weights, use_learnable_weights=use_learnable_weights), losses_names
     else:
         loss = LossType[param["loss"]["type"][0].upper()]
         return loss.value(**kwargs), loss.name

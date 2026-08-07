@@ -312,7 +312,7 @@ class LightningModule(L.LightningModule):
         target_physical = self.model.build_outputs(batch, target_delta_normalized)
 
         if self.is_multiloss:
-            loss, train_losses = self.loss(
+            loss, train_losses, weights = self.loss(
                 graph=batch,
                 target=target_delta_normalized,
                 network_output=network_output,
@@ -323,7 +323,14 @@ class LightningModule(L.LightningModule):
                 gradient_method=self.gradient_method,
                 return_all_losses=True,
             )
-            for train_loss, loss_name in zip(train_losses, self.loss_name):
+            self.log(
+                "loss ratio",
+                train_losses[0].item() / train_losses[1].item(),
+                on_step=True,
+                on_epoch=True,
+                prog_bar=True,
+            )
+            for train_loss, loss_name, weight in zip(train_losses, self.loss_name, weights):
                 self.log(
                     f"train_{loss_name}",
                     train_loss,
@@ -331,6 +338,15 @@ class LightningModule(L.LightningModule):
                     on_epoch=True,
                     prog_bar=False,
                 )
+                # self.log(
+                #     f"W_{loss_name}",
+                #     0.5 * torch.exp(-weight),
+                #     on_step=True,
+                #     on_epoch=True,
+                #     prog_bar=False,
+                # )
+            # print(f"loss ratio: {train_losses[1]/train_losses[0]}")
+
             self.log(
                 "train_multiloss", loss, on_step=True, on_epoch=True, prog_bar=False
             )
@@ -579,8 +595,12 @@ class LightningModule(L.LightningModule):
 
     def configure_optimizers(self):
         """Initialize the optimizer"""
+        if isinstance(self.loss, MultiLoss) and self.loss.use_learnable_weights:
+            model_parameters = list(self.parameters()) + [self.loss.learned_weights]
+        else:
+            model_parameters = self.parameters()
         opt = torch.optim.AdamW(
-            self.parameters(),
+            model_parameters,
             lr=self.learning_rate,
             weight_decay=0.0001,
             betas=(0.9, 0.95),
