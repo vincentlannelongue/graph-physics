@@ -24,7 +24,6 @@ from graphphysics.training.parse_parameters import (
 from graphphysics.utils.progressbar import ColabProgressBar
 
 from setproctitle import setproctitle
-setproctitle("AX_trainings_part")
 
 warnings.filterwarnings(
     "ignore", ".*Trying to infer the `batch_size` from an ambiguous collection.*"
@@ -123,6 +122,7 @@ def main(argv):
     num_partitions = FLAGS.num_partitions
     max_nodes_per_partition = FLAGS.max_nodes_per_partition
     gradient_batch_size = FLAGS.gradient_batch_size
+    setproctitle(f"AX_trainings_{FLAGS.seed}")
 
     training_params = parameters.setdefault("training", {})
     enable_vram_optimizations = bool(

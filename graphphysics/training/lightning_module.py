@@ -323,14 +323,17 @@ class LightningModule(L.LightningModule):
                 gradient_method=self.gradient_method,
                 return_all_losses=True,
             )
-            self.log(
-                "loss ratio",
-                train_losses[0].item() / train_losses[1].item(),
-                on_step=True,
-                on_epoch=True,
-                prog_bar=True,
-            )
+            # self.log(
+            #     "loss ratios:",
+            #     train_losses[0].item() / train_losses[1].item(),
+            #     on_step=True,
+            #     on_epoch=True,
+            #     prog_bar=True,
+            # )
             for train_loss, loss_name, weight in zip(train_losses, self.loss_name, weights):
+
+                # print(f"{loss_name} ratio: ", train_loss.item() / train_losses[0].item())
+
                 self.log(
                     f"train_{loss_name}",
                     train_loss,
@@ -338,13 +341,13 @@ class LightningModule(L.LightningModule):
                     on_epoch=True,
                     prog_bar=False,
                 )
-                # self.log(
-                #     f"W_{loss_name}",
-                #     0.5 * torch.exp(-weight),
-                #     on_step=True,
-                #     on_epoch=True,
-                #     prog_bar=False,
-                # )
+                self.log(
+                    f"W_{loss_name}",
+                    0.5 * torch.exp(-weight),
+                    on_step=True,
+                    on_epoch=True,
+                    prog_bar=False,
+                )
             # print(f"loss ratio: {train_losses[1]/train_losses[0]}")
 
             self.log(

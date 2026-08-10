@@ -77,6 +77,48 @@ class L2Loss(_Loss):
         return torch.mean(errors)
 
 
+# TODO: exact copy for name sake, need to refactor.
+class L2LossWSS(_Loss):
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+
+    @property
+    def __name__(self):
+        return "MSE_WSS"
+
+    def forward(
+        self,
+        target: torch.Tensor,
+        network_output: torch.Tensor,
+        node_type: torch.Tensor,
+        masks: List[NodeType],
+        selected_indexes: torch.Tensor = None,
+        **kwargs
+    ) -> torch.Tensor:
+        """
+        Computes L2 loss for nodes of specific types.
+
+        Args:
+            target (torch.Tensor): The target values.
+            network_output (torch.Tensor): The predicted values from the network.
+            node_type (torch.Tensor): Tensor containing the type of each node.
+            masks (List[NodeType]): List of NodeTypes to include in the loss calculation.
+            selected_indexes (torch.Tensor, optional): Indexes of nodes to exclude from the loss calculation.
+
+        Returns:
+            torch.Tensor: The mean squared error for the specified node types.
+
+        Note:
+            This method calculates the L2 loss only for nodes of the types specified in 'masks'.
+            If 'selected_indexes' is provided, those nodes are excluded from the loss calculation.
+        """
+        mask = _prepare_mask_for_loss(
+            network_output, node_type, masks, selected_indexes
+        )
+        errors = ((network_output - target) ** 2)[mask]
+        return torch.mean(errors)
+
+
 class CosineLoss(_Loss):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
@@ -472,21 +514,33 @@ class RelativeL2Loss(_Loss):
 
 
 class MultiLoss(_Loss):
-    def __init__(self, losses, weights, use_learnable_weights=False, **kwargs):
+    def __init__(
+        self,
+        losses,
+        loss_index_start: List[int],
+        loss_index_end: List[int],
+        weights,
+        use_learnable_weights=False,
+        **kwargs
+    ):
         """
         Combines multiple loss functions into a single loss.
         All losses are weighted with fixed weights, possibly combined with learnable weights.
         The learnable weights are implemented as described in the paper:
         'Multi-Task Learning Using Uncertainty to Weigh Losses for Scene Geometry and Semantics'.
-        
+
 
         Args:
             losses (list): List of loss functions to combine.
+            loss_index_start (list): List of start indices for each loss function in the network output.
+            loss_index_end (list): List of end indices for each loss function in the network output
             weights (list): List of weights for each loss function.
             use_learnable_weights (bool): If True, the weights will be learnable parameters.
         """
         super().__init__(**kwargs)
         self.losses = losses
+        self.loss_index_start = loss_index_start
+        self.loss_index_end = loss_index_end
         self.weights = weights
         self.use_learnable_weights = use_learnable_weights
         if self.use_learnable_weights:
@@ -502,6 +556,8 @@ class MultiLoss(_Loss):
     def forward(
         self,
         graph: Data = None,
+        network_output: torch.Tensor = None,
+        target: torch.Tensor = None,
         network_output_physical: torch.Tensor = None,
         target_physical: torch.Tensor = None,
         gradient_method: str = None,
@@ -511,19 +567,24 @@ class MultiLoss(_Loss):
         """
         Combines multiple loss, weighted with fixed weights.
         """
+        # print(f"SHAPE: {network_output_physical.shape}, {target_physical.shape}")
         if gradient_method is not None:
             network_output_gradient = compute_gradient(
                 graph=graph,
-                field=network_output_physical,
+                field=network_output_physical[:, self.loss_index_start[0]:self.loss_index_end[0]],
                 method=gradient_method,
                 device=device,
             )
             target_gradient = compute_gradient(
                 graph=graph,
-                field=target_physical,
+                field=target_physical[:, self.loss_index_start[0]:self.loss_index_end[0]],
                 method=gradient_method,
                 device=device,
             )
+            # print(f"SHAPE target: {target_physical.shape}")
+            # print(f"indexes: {self.loss_index_start}, {self.loss_index_end}")
+
+            # print(f"SHAPE: {target_gradient.shape}")
 
             # Normalizer is tuned with ground truth gradients only to remain consistent.
             num_nodes = network_output_gradient.shape[0]
@@ -541,6 +602,8 @@ class MultiLoss(_Loss):
         losses = [
             loss(
                 graph=graph,
+                target=target[:, self.loss_index_start[i]: self.loss_index_end[i]],
+                network_output=network_output[:, self.loss_index_start[i]: self.loss_index_end[i]],
                 network_output_physical=network_output_physical,
                 target_physical=target_physical,
                 gradient_method=gradient_method,
@@ -548,7 +611,7 @@ class MultiLoss(_Loss):
                 target_gradient=target_gradient_normalized,
                 **kwargs
             )
-            for loss in self.losses
+            for i, loss in enumerate(self.losses)
         ]
         weighted_losses = [w * loss for w, loss in zip(self.weights, losses)]
 
@@ -559,7 +622,11 @@ class MultiLoss(_Loss):
             ]
         errors = sum(weighted_losses)
         if return_all_losses:
-            return errors, weighted_losses, self.learned_weights if self.use_learnable_weights else self.weights
+            return (
+                errors,
+                weighted_losses,
+                self.learned_weights if self.use_learnable_weights else self.weights,
+            )
         else:
             return errors
 
@@ -610,6 +677,7 @@ class L2LossNorm(_Loss):
 
 class LossType(enum.Enum):
     L2LOSS = L2Loss
+    L2LOSSWSS = L2LossWSS
     COSINEL2LOSS = CosineLoss
     L1SMOOTHLOSS = L1SmoothLoss
     GRADIENTL2LOSS = GradientL2Loss

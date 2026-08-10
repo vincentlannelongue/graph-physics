@@ -309,23 +309,43 @@ def get_loss(param: Dict[str, Any], **kwargs):
         Union[str, List[str]]: loss name if single loss, list of loss name if MultiLoss.
     """
     try:
-        _ = param["loss"]
+        loss_parameters = param["loss"]
     except KeyError:
         logger.info("No loss specified, fall back to default loss L2Loss")
         return LossType.L2LOSS.value(**kwargs), LossType.L2LOSS.name
 
-    if len(param["loss"]["type"]) > 1:
-        losses = [LossType[t.upper()].value(**kwargs) for t in param["loss"]["type"]]
-        losses_names = [LossType[t.upper()].name for t in param["loss"]["type"]]
-        weights = param["loss"]["weights"]
-        use_learnable_weights = param["loss"].get("use_learnable_weights", False)
+    if len(loss_parameters["type"]) > 1:
+        losses = [LossType[t.upper()].value(**kwargs) for t in loss_parameters["type"]]
+        losses_names = [LossType[t.upper()].name for t in loss_parameters["type"]]
+        weights = loss_parameters["weights"]
+        use_learnable_weights = loss_parameters.get("use_learnable_weights", False)
         if use_learnable_weights:
             logger.info("Using learnable weights for MultiLoss.")
         else:
             logger.info("Using fixed weights for MultiLoss.")
-        return MultiLoss(losses, weights, use_learnable_weights=use_learnable_weights), losses_names
+
+        try:
+            loss_parameters["loss_index_start"]
+        except KeyError:
+            logger.warning("Loss indexes not specified, computing on all outputs.")
+            loss_parameters["loss_index_start"] = [
+                param["index"]["output_index_start"]
+            ] * len(losses)
+            loss_parameters["loss_index_end"] = [
+                param["index"]["output_index_end"]
+            ] * len(losses)
+        return (
+            MultiLoss(
+                losses=losses,
+                loss_index_start=loss_parameters["loss_index_start"],
+                loss_index_end=loss_parameters["loss_index_end"],
+                weights=weights,
+                use_learnable_weights=use_learnable_weights,
+            ),
+            losses_names,
+        )
     else:
-        loss = LossType[param["loss"]["type"][0].upper()]
+        loss = LossType[loss_parameters["type"][0].upper()]
         return loss.value(**kwargs), loss.name
 
 
@@ -359,5 +379,7 @@ def get_masks(param: Dict[str, Any], **kwargs):
         training_nodetypes = param["dataset"]["training_nodetypes"]
         return [NodeType[t.upper()] for t in training_nodetypes]
     except KeyError:
-        logger.info("No training nodetypes specified, fall back to default: NORMAL and OUTFLOW nodes.")
+        logger.info(
+            "No training nodetypes specified, fall back to default: NORMAL and OUTFLOW nodes."
+        )
         return [NodeType.NORMAL, NodeType.OUTFLOW]
