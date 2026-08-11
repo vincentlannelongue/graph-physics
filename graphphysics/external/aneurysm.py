@@ -11,6 +11,15 @@ def build_features(graph: Data) -> Data:
     # inlet_lvlst = graph.x[:, 4]
     node_type = graph.x[:, 4]
     timestep = graph.x[:, 5]
+    # print(f"num of aneurysm nodes: {(node_type == NodeType.ANEURYSM).sum()}")
+    # print(f"num of normal nodes: {(node_type == NodeType.NORMAL).sum()}")
+
+    if NodeType.ANEURYSM in torch.unique(node_type):
+        # print("ANEURYSM NODE TYPE FOUND")
+        # switch all aneurysm node types to normal
+        node_type[node_type == NodeType.ANEURYSM] = NodeType.NORMAL
+    # print("UNIQUE", torch.unique(node_type))
+    # print(f"num of normal nodes: {(node_type == NodeType.NORMAL).sum()}")
     # print("UNIQUE", torch.unique(node_type))
 
     current_velocity = graph.x[:, 0:3]
@@ -25,17 +34,21 @@ def build_features(graph: Data) -> Data:
     # print(f"CHECK: {torch.max(current_velocity[not_inflow_mask])} and {torch.min(current_velocity[not_inflow_mask])}")
 
     next_acceleration[not_inflow_mask] = 0
-    next_acceleration_unique = next_acceleration.unique()
-
+    norm_next_acceleration = torch.norm(next_acceleration, dim=1)
     mean_next_accel = torch.ones(node_type.shape, device=device) * torch.mean(
-        next_acceleration_unique
+        norm_next_acceleration
     )
-    min_next_accel = torch.ones(node_type.shape, device=device) * torch.min(
-        next_acceleration_unique
-    )
-    max_next_accel = torch.ones(node_type.shape, device=device) * torch.max(
-        next_acceleration_unique
-    )
+    # next_acceleration_unique = next_acceleration.unique()
+
+    # mean_next_accel = torch.ones(node_type.shape, device=device) * torch.mean(
+    #     next_acceleration_unique
+    # )
+    # min_next_accel = torch.ones(node_type.shape, device=device) * torch.min(
+    #     next_acceleration_unique
+    # )
+    # max_next_accel = torch.ones(node_type.shape, device=device) * torch.max(
+    #     next_acceleration_unique
+    # )
 
     graph.x = torch.cat(
         (
@@ -44,8 +57,8 @@ def build_features(graph: Data) -> Data:
             acceleration,
             graph.pos,
             mean_next_accel.unsqueeze(1),
-            min_next_accel.unsqueeze(1),
-            max_next_accel.unsqueeze(1),
+            # min_next_accel.unsqueeze(1),
+            # max_next_accel.unsqueeze(1),
             # inlet_lvlst.unsqueeze(1),
             node_type.to(device).unsqueeze(1),
         ),
