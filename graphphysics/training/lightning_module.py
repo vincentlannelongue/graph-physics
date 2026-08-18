@@ -48,8 +48,10 @@ def build_aneurysm_mask(param: dict, graph: Batch):
         node_type = graph.x[:, 0, param["index"]["node_type_index"]]
     else:
         node_type = graph.x[:, param["index"]["node_type_index"]]
-    # mask = node_type == NodeType.ANEURYSM
-    mask = torch.logical_and(graph.pos[:, 1] >= 7.8, node_type == NodeType.NORMAL)
+    if NodeType.ANEURYSM in torch.unique(node_type):
+        mask = node_type == NodeType.ANEURYSM
+    else:
+        mask = torch.logical_and(graph.pos[:, 1] >= 7.8, node_type == NodeType.NORMAL)
 
     return mask
 

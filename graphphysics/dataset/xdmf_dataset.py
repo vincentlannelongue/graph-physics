@@ -86,7 +86,7 @@ class XDMFDataset(BaseDataset):
         """
         traj_index, frame, subgraph_idx = self._get_indices(index)
         xdmf_file = self.file_paths[traj_index]
-        mesh_id = os.path.splitext(os.path.basename(xdmf_file))[0].rsplit("_", 1)[-1]
+        mesh_id = os.path.splitext(os.path.basename(xdmf_file))[0]
 
         with meshio.xdmf.TimeSeriesReader(xdmf_file) as reader:
             num_steps = reader.num_steps
