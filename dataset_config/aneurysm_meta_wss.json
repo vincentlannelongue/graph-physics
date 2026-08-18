@@ -46,6 +46,15 @@
         ],
         "dtype": "float32"
       },
+      "LevelSetCenterline": {
+        "type": "static",
+        "shape": [
+          79,
+          -1,
+          1
+        ],
+        "dtype": "float32"
+      },
       "node_type": {
         "type": "static",
         "shape": [
@@ -62,6 +71,7 @@
       "Vitesse",
       "WSS",
       "LevelSetInlet",
+      "LevelSetCenterline",
       "node_type"
     ],
     "trajectory_length": 79
