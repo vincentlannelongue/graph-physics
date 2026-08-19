@@ -1,27 +1,56 @@
 import torch
 from torch_geometric.data import Data
+import random
 
 from graphphysics.utils.nodetype import NodeType
 
 device = "cuda" if torch.cuda.is_available() else "cpu"
 
 
+STENT_IDX = {
+  "S1": 1,
+  "S2": 2,
+  "S3": 3
+}
+
+STENT_FT = {
+  "S1": [36, 0.35756],
+  "S2": [24, 0.5363],
+  "S3": [16, 0.805]
+}
+
+
 def build_features(graph: Data) -> Data:
-    # print(f"BEFORE: {graph.x[6000]}")
+    # idx = random.randint(0, graph.x.shape[0] - 1)
+    # print(f"IDX: {idx}")
+    # print(f"BEFORE: {graph.x[idx]}")
     inlet_lvlst = graph.x[:, 3]
     centerline_lvlst = graph.x[:, 4]
     stent_lvlst = torch.zeros(centerline_lvlst.shape[0], device=device)
     node_type = graph.x[:, 5]
-
-    if NodeType.ANEURYSM in torch.unique(node_type):
-        # print("ANEURYSM NODE TYPE FOUND")
-        # switch all aneurysm node types to normal
-        node_type[node_type == NodeType.ANEURYSM] = NodeType.NORMAL
-
     timestep = graph.x[:, 6]
+
+    stent_index = 0
     stent_one_hot = torch.zeros((centerline_lvlst.shape[0], 4), device=device)
-    stent_one_hot[:, 0] = torch.ones(centerline_lvlst.shape[0], device=device)
     stent_features = torch.zeros((centerline_lvlst.shape[0], 5), device=device)
+
+    # if NodeType.ANEURYSM in torch.unique(node_type):
+    #     # print("ANEURYSM NODE TYPE FOUND")
+    #     # switch all aneurysm node types to normal
+    #     node_type[node_type == NodeType.ANEURYSM] = NodeType.NORMAL
+
+    if NodeType.STENT in torch.unique(node_type):
+        stent_number = graph.id.split("_")[-1]
+        # print(f"stent_num: {stent_number}")
+        stent_lvlst = graph.x[:, 6]
+        timestep = graph.x[:, 7]
+        stent_index = STENT_IDX[stent_number]
+        features = STENT_FT[stent_number]
+        stent_features[:, 0] = features[0]
+        stent_features[:, 1] = features[1]
+
+    stent_one_hot[:, stent_index] = torch.ones(centerline_lvlst.shape[0], device=device)
+
     # print("UNIQUE", torch.unique(node_type))
     # print("center max", torch.max(centerline_lvlst))
     # print("inlet max", torch.max(inlet_lvlst))
@@ -60,24 +89,38 @@ def build_features(graph: Data) -> Data:
         dim=1,
     )
 
-    # print(f"AFTER: {graph.x[6000]}")
+    # print(f"AFTER: {graph.x[idx]}")
     return graph
 
 
 def build_features_w_wss(graph: Data) -> Data:
-    # print(f"BEFORE: {graph.x[6000]}")
+    # print(f"\nBEFORE: {graph.x[6000]}")
+    # print(graph)
     inlet_lvlst = graph.x[:, 6]
     centerline_lvlst = graph.x[:, 7]
-    stent_lvlst = torch.zeros(centerline_lvlst.shape[0], device=device)
     node_type = graph.x[:, 8]
     timestep = graph.x[:, 9]
     stent_one_hot = torch.zeros((centerline_lvlst.shape[0], 4), device=device)
-    stent_one_hot[:, 0] = torch.ones(centerline_lvlst.shape[0], device=device)
+    stent_index = 0
+    stent_lvlst = torch.zeros(centerline_lvlst.shape[0], device=device)
     stent_features = torch.zeros((centerline_lvlst.shape[0], 5), device=device)
-    if NodeType.ANEURYSM in torch.unique(node_type):
-        # print("ANEURYSM NODE TYPE FOUND")
-        # switch all aneurysm node types to normal
-        node_type[node_type == NodeType.ANEURYSM] = NodeType.NORMAL
+
+    if NodeType.STENT in torch.unique(node_type):
+        stent_number = graph.id.split("_")[-1]
+        # print(f"stent_num: {stent_number}")
+        stent_lvlst = graph.x[:, 9]
+        timestep = graph.x[:, 10]
+        stent_index = STENT_IDX[stent_number]
+        features = STENT_FT[stent_number]
+        stent_features[:, 0] = features[0]
+        stent_features[:, 1] = features[1]
+
+    stent_one_hot[:, stent_index] = torch.ones(centerline_lvlst.shape[0], device=device)
+
+    # if NodeType.ANEURYSM in torch.unique(node_type):
+    #     # print("ANEURYSM NODE TYPE FOUND")
+    #     # switch all aneurysm node types to normal
+    #     node_type[node_type == NodeType.ANEURYSM] = NodeType.NORMAL
 
     # print("UNIQUE", torch.unique(node_type))
 

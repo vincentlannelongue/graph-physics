@@ -3,9 +3,9 @@
         "extension": "xdmf",
         "train_path": "/scratch-big/vlannelongue1/00_Data/Datasets/StentCoarse/train",
         "test_path": "/scratch-big/vlannelongue1/00_Data/Datasets/StentCoarse/test",
-        "meta_path": "dataset_config/stent_wss_meta.json",
-        "targets": ["Vitesse", "WSS"],
-        "training_nodetypes":["normal", "outflow", "aneurysm", "wall_boundary"],
+        "meta_path": "dataset_config/stent_meta.json",
+        "targets": ["Vitesse"],
+        "training_nodetypes":["normal", "outflow", "aneurysm", "stent", "wall_boundary"],
         "khop": 1,
         "new_edges_ratio": 0
     },
@@ -13,34 +13,26 @@
         "type": "transformer",
         "message_passing_num": 15,
         "hidden_size": 128,
-        "node_input_size": 25,
-        "output_size": 6,
+        "node_input_size": 22,
+        "output_size": 3,
         "edge_input_size": 0,
         "num_heads": 4,
         "use_silu_activation": false,
         "use_rope_embeddings": false,
         "use_gated_attention": false
     },
-    "loss": {
-        "type": ["l2loss", "l2losswss", "gradientl2loss"],
-        "gradient_method": "finite_diff",
-        "weights": [0.5, 0.5, 30.0],
-        "loss_index_start": [0, 3, 0],
-        "loss_index_end": [3, 6, 3],
-        "use_learnable_weights": true
-    },
     "index": {
         "feature_index_start": 0,
-        "feature_index_end": 25,
+        "feature_index_end": 22,
         "output_index_start": 0,
-        "output_index_end": 6,
-        "node_type_index": 25
+        "output_index_end": 3,
+        "node_type_index": 22
     },
     "transformations": {
         "preprocessing": {
-            "noise": [10.0, 10.0, 10.0, 0.1, 0.1, 0.1, 10.0, 10.0, 10.0],
-            "noise_index_start": [0, 1, 2, 3, 4, 5, 7, 8, 9],
-            "noise_index_end": [1, 2, 3, 4, 5, 6, 8, 9, 10],
+            "noise": [10.0, 10.0, 10.0, 10.0, 10.0, 10.0],
+            "noise_index_start": [0, 1, 2, 4, 5, 6],
+            "noise_index_end": [1, 2, 3, 5, 6, 7],
             "masking": 0
         },
         "world_pos_parameters": {
