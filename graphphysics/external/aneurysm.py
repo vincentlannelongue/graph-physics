@@ -7,19 +7,11 @@ device = "cuda" if torch.cuda.is_available() else "cpu"
 
 
 def build_features(graph: Data) -> Data:
-    # print(f"BEFORE: {graph.x[6000]}")
+    # print(f"BEFORE: {graph.x[-1]}")
     # inlet_lvlst = graph.x[:, 4]
-    node_type = graph.x[:, 4]
-    timestep = graph.x[:, 5]
-    # print(f"num of aneurysm nodes: {(node_type == NodeType.ANEURYSM).sum()}")
-    # print(f"num of normal nodes: {(node_type == NodeType.NORMAL).sum()}")
+    node_type = graph.x[:, 3]
+    timestep = graph.x[:, 4]
 
-    if NodeType.ANEURYSM in torch.unique(node_type):
-        # print("ANEURYSM NODE TYPE FOUND")
-        # switch all aneurysm node types to normal
-        node_type[node_type == NodeType.ANEURYSM] = NodeType.NORMAL
-    # print("UNIQUE", torch.unique(node_type))
-    # print(f"num of normal nodes: {(node_type == NodeType.NORMAL).sum()}")
     # print("UNIQUE", torch.unique(node_type))
 
     current_velocity = graph.x[:, 0:3]
@@ -27,28 +19,14 @@ def build_features(graph: Data) -> Data:
     previous_velocity = torch.tensor(graph.previous_data["Vitesse"], device=device)
 
     acceleration = current_velocity - previous_velocity
-    next_acceleration = target_velocity - current_velocity
-
+    norm_next_acceleration = torch.norm(target_velocity, dim=1) - torch.norm(
+        current_velocity, dim=1
+    )
     not_inflow_mask = node_type != NodeType.INFLOW
-
-    # print(f"CHECK: {torch.max(current_velocity[not_inflow_mask])} and {torch.min(current_velocity[not_inflow_mask])}")
-
-    next_acceleration[not_inflow_mask] = 0
-    norm_next_acceleration = torch.norm(next_acceleration, dim=1)
+    norm_next_acceleration[not_inflow_mask] = 0
     mean_next_accel = torch.ones(node_type.shape, device=device) * torch.mean(
         norm_next_acceleration
     )
-    # next_acceleration_unique = next_acceleration.unique()
-
-    # mean_next_accel = torch.ones(node_type.shape, device=device) * torch.mean(
-    #     next_acceleration_unique
-    # )
-    # min_next_accel = torch.ones(node_type.shape, device=device) * torch.min(
-    #     next_acceleration_unique
-    # )
-    # max_next_accel = torch.ones(node_type.shape, device=device) * torch.max(
-    #     next_acceleration_unique
-    # )
 
     graph.x = torch.cat(
         (
@@ -57,15 +35,12 @@ def build_features(graph: Data) -> Data:
             acceleration,
             graph.pos,
             mean_next_accel.unsqueeze(1),
-            # min_next_accel.unsqueeze(1),
-            # max_next_accel.unsqueeze(1),
-            # inlet_lvlst.unsqueeze(1),
             node_type.to(device).unsqueeze(1),
         ),
         dim=1,
     )
 
-    # print(f"AFTER: {graph.x[6000]}")
+    # print(f"AFTER: {graph.x[-1]}")
     return graph
 
 

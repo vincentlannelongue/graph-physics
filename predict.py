@@ -1,13 +1,22 @@
+import json
 import os
 import subprocess
 
 # MODEL = "M2_NS"
-for model in ["NS_split"]:
-    for seed in [1, 2, 3]:
+for model in ["KDC_baseline"]:
+    for seed in [2, 3]:
         model_path = f"checkpoints/{model}_{seed}.ckpt"
         if os.path.exists(model_path):
+            # Check inference path
+            parameters_path = f"training_config/{model}.json"
+            with open(parameters_path, "r") as fp:
+                parameters = json.load(fp)
+            if "test" in parameters["dataset"]["test_path"]:
+                raise ValueError(
+                    f"Test path in {parameters_path} is set to 'test', which is not allowed for inference."
+                )
             config = {
-                "predict_parameters_path": f"training_config/{model}.json",
+                "predict_parameters_path": parameters_path,
                 "model_path": model_path,
                 "prediction_save_path": f"predictions/{model}_{seed}",
                 "no_edge_feature": None,

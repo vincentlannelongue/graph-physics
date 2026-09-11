@@ -1,0 +1,4 @@
+Model,RMSE_Vitesse,RMSE_Vitesse_std,RMSE_Rel_Vitesse,RMSE_Rel_Vitesse_std
+KDC_baseline_1,1.6975,0.6546,0.5745,0.2135
+KDC_baseline_2,1.7192,0.6858,0.5013,0.1728
+KDC_baseline_3,1.7892,0.6305,0.7398,0.3100

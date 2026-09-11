@@ -122,7 +122,7 @@ def main(argv):
     num_partitions = FLAGS.num_partitions
     max_nodes_per_partition = FLAGS.max_nodes_per_partition
     gradient_batch_size = FLAGS.gradient_batch_size
-    setproctitle(f"AX_trainings_{FLAGS.seed}")
+    setproctitle(f"KD_trainings_{FLAGS.seed}")
 
     training_params = parameters.setdefault("training", {})
     enable_vram_optimizations = bool(
