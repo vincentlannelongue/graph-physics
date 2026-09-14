@@ -8,9 +8,10 @@ device = "cuda" if torch.cuda.is_available() else "cpu"
 
 def build_features(graph: Data) -> Data:
     # print(f"BEFORE: {graph.x[-1]}")
-    # inlet_lvlst = graph.x[:, 4]
     node_type = graph.x[:, 3]
-    timestep = graph.x[:, 4]
+    inlet_lvlst = graph.x[:, 4]
+    centerline_lvlst = graph.x[:, 5]
+    timestep = graph.x[:, 6]
 
     # print("UNIQUE", torch.unique(node_type))
 
@@ -35,6 +36,8 @@ def build_features(graph: Data) -> Data:
             acceleration,
             graph.pos,
             mean_next_accel.unsqueeze(1),
+            inlet_lvlst.unsqueeze(1),
+            centerline_lvlst.unsqueeze(1),
             node_type.to(device).unsqueeze(1),
         ),
         dim=1,
