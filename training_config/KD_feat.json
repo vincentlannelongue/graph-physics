@@ -1,8 +1,8 @@
 {
     "dataset": {
         "extension": "xdmf",
-        "train_path": "/scratch-big/vlannelongue1/00_Data/Datasets/KD_Coarse/train",
-        "test_path": "/scratch-big/vlannelongue1/00_Data/Datasets/KD_Coarse/test",
+        "train_path": "/scratch-big/vlannelongue1/00_Data/Datasets/KD_Fine/train",
+        "test_path": "/scratch-big/vlannelongue1/00_Data/Datasets/KD_Fine/test",
         "meta_path": "dataset_config/kd_feat_meta.json",
         "targets": ["Vitesse"],
         "khop": 1,
