@@ -216,6 +216,7 @@ def meshdata_to_graph(
         y=target_features,
         pos=torch.tensor(points, dtype=torch.float32),
         id=id,
+        num_nodes=points.shape[0],
         next_data=next_data,
     )
 

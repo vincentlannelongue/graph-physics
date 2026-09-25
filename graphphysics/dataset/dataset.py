@@ -298,6 +298,7 @@ class BaseDataset(Dataset, ABC):
             # face=face,
             num_nodes=x.size(0),
             traj_index=graph.traj_index,
+            id=graph.id,
         )
         return sub_graph
 

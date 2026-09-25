@@ -1,16 +1,18 @@
 python -m graphphysics.train \
             --project_name=KD \
-            --training_parameters_path=training_config/KDC_baseline.json \
+            --training_parameters_path=training_config/KD_part_noise03.json \
             --num_epochs=20 \
             --init_lr=0.001 \
             --batch_size=1 \
             --warmup=500 \
             --num_workers=0 \
             --prefetch_factor=0 \
-            --model_save_name=KDC_baseline_1 \
+            --model_save_name=KD_part50_long_3 \
             --no_edge_feature \
             --use_previous_data=true \
             --previous_data_start=4 \
             --previous_data_end=7 \
-            --seed=1 \
-            # --model_path=checkpoints/.ckpt \
+            --seed=3 \
+            --use_partitioning=true \
+            --max_nodes_per_partition=50000 \
+            --model_path=checkpoints/KDC_noise01_3.ckpt \
